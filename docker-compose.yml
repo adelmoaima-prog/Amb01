@@ -31,33 +31,28 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ambuser}:${POSTGRES_PASSWORD:-ambpass2024}@postgres:5432/${POSTGRES_DB:-ambulatorio}
       SECRET_KEY: ${SECRET_KEY:-supersecretkey-change-in-production-min32chars}
       FERNET_KEY: ${FERNET_KEY:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       MFA_BYPASS_DEV: ${MFA_BYPASS_DEV:-true}
     volumes:
-      - ./backend:/app
       - backend_reports:/app/reports
     networks:
       - amb-network
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api/v1}
     container_name: amb_frontend
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      NODE_ENV: production
     networks:
       - amb-network
     restart: unless-stopped
