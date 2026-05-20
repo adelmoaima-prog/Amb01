@@ -66,7 +66,6 @@ async def verify_mfa(body: MFAVerifyRequest, db: AsyncSession = Depends(get_db))
 
 @router.get("/me", response_model=UserProfile)
 async def get_me(current_user: User = Depends(get_current_user)):
-    await current_user.awaitable_attrs.role
     return UserProfile(
         id=current_user.id,
         nome=current_user.nome,
