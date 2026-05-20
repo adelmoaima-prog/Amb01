@@ -4,7 +4,7 @@ Run: python -m app.seed.seed_data
 """
 import asyncio
 import random
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time as dtime
 import uuid
 import calendar
 
@@ -203,8 +203,8 @@ async def seed(engine):
         for idx, (prof, esp) in enumerate(prof_list):
             dia = dias_semana[idx % 5]
             turno = prof.turno_preferencial
-            hora_ini = {"manha": "07:00", "tarde": "13:00", "noite": "19:00"}[turno]
-            hora_fim = {"manha": "12:00", "tarde": "17:30", "noite": "22:00"}[turno]
+            hora_ini = {"manha": dtime(7, 0), "tarde": dtime(13, 0), "noite": dtime(19, 0)}[turno]
+            hora_fim = {"manha": dtime(12, 0), "tarde": dtime(17, 30), "noite": dtime(22, 0)}[turno]
             consultorio = consultorios[idx % len(consultorios)]
             agenda = Agenda(
                 especialidade_id=esp.id,
@@ -262,6 +262,7 @@ async def seed(engine):
                 session.add(meta)
 
             # Escalas e consultas por dia
+            cap_inseridos: set = set()  # track (data, turno, consultorio_id) to avoid duplicates
             for d in days:
                 for agenda, prof, esp, consultorio in agendas:
                     turno = prof.turno_preferencial
@@ -282,26 +283,29 @@ async def seed(engine):
                     session.add(escala)
                     todas_escalas.append(escala)
 
-                    # Capacidade
-                    vagas_of = agenda.vagas_total if escala_status == "confirmado" else 0
-                    vagas_oc = int(vagas_of * random.uniform(0.5, 1.0))
-                    status_sala = "ocupada" if vagas_oc > 0 else "ociosa"
-                    if escala_status == "cancelado":
-                        status_sala = "ociosa"
-                        vagas_of = 0
-                        vagas_oc = 0
+                    # Capacidade — skip if same (data, turno, consultorio) already inserted
+                    cap_key = (d, turno, str(consultorio.id))
+                    if cap_key not in cap_inseridos:
+                        cap_inseridos.add(cap_key)
+                        vagas_of = agenda.vagas_total if escala_status == "confirmado" else 0
+                        vagas_oc = int(vagas_of * random.uniform(0.5, 1.0))
+                        status_sala = "ocupada" if vagas_oc > 0 else "ociosa"
+                        if escala_status == "cancelado":
+                            status_sala = "ociosa"
+                            vagas_of = 0
+                            vagas_oc = 0
 
-                    cap = CapacidadeTurno(
-                        data=d,
-                        turno=turno,
-                        consultorio_id=consultorio.id,
-                        agenda_id=agenda.id,
-                        profissional_id=prof.id,
-                        vagas_ofertadas=vagas_of,
-                        vagas_ocupadas=vagas_oc,
-                        status_sala=status_sala,
-                    )
-                    session.add(cap)
+                        cap = CapacidadeTurno(
+                            data=d,
+                            turno=turno,
+                            consultorio_id=consultorio.id,
+                            agenda_id=agenda.id,
+                            profissional_id=prof.id,
+                            vagas_ofertadas=vagas_of,
+                            vagas_ocupadas=vagas_oc,
+                            status_sala=status_sala,
+                        )
+                        session.add(cap)
 
                     if escala_status == "cancelado":
                         continue
